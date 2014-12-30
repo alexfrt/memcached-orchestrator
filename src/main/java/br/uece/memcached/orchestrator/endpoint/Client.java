@@ -34,6 +34,9 @@ public class Client extends GenericHandler {
 	@Override
 	public void channelReadComplete(ChannelHandlerContext handlerContext) {
 		handlerContext.flush();
-		currentCommand = null;
+		
+		if (currentCommand.isComplete()) {
+			currentCommand = null;
+		}
 	}
 }

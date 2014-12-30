@@ -22,11 +22,13 @@ public class Delete extends Command {
 		
 		this.server.registerMessageHandler(this);
 		this.server.sendMessage(commandMessage);
+		
+		this.hasResponded = Boolean.FALSE;
 	}
 	
 	@Override
 	public void handle(String message) {
-		getContext().write(message);
+		getContext().writeAndFlush(message);
 		hasResponded = Boolean.TRUE;
 		
 		synchronized (server) {

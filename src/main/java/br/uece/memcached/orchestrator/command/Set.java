@@ -24,15 +24,13 @@ public class Set extends Command {
 		
 		this.server.registerMessageHandler(this);
 		this.server.sendMessage(commandMessage);
-		System.out.println("Send - " + commandMessage);
 		
 		hasResponded = Boolean.FALSE;
 	}
 	
 	@Override
 	public void handle(String message) {
-		System.out.println("Receipt - " + message);
-		getContext().write(message);
+		getContext().writeAndFlush(message);
 		hasResponded = Boolean.TRUE;
 		
 		synchronized (server) {
@@ -53,8 +51,7 @@ public class Set extends Command {
 	@Override
 	public void append(String message) {
 		if (!isComplete()) {
-			System.out.println("Send - " + message);
-			getContext().write(message);
+			this.server.sendMessage(message);
 			isComplete = Boolean.TRUE;
 		}
 		else {

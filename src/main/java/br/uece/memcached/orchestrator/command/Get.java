@@ -25,13 +25,11 @@ public class Get extends Command {
 		
 		this.server.registerMessageHandler(this);
 		this.server.sendMessage(commandMessage);
-		System.out.println("Send - " + commandMessage);
 	}
 	
 	@Override
 	public void handle(String message) {
-		System.out.println("Receipt - " + message);
-		getContext().write(message);
+		getContext().writeAndFlush(message);
 		lastResponseMessage = message;
 		
 		synchronized (server) {
