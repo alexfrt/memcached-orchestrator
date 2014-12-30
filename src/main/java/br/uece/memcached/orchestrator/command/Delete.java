@@ -2,43 +2,37 @@ package br.uece.memcached.orchestrator.command;
 
 import java.util.List;
 
+import io.netty.channel.ChannelHandlerContext;
+
 import org.apache.commons.lang3.StringUtils;
 
-import io.netty.channel.ChannelHandlerContext;
-import br.uece.memcached.orchestrator.ServersHandler;
 import br.uece.memcached.orchestrator.endpoint.Server;
-import br.uece.memcached.orchestrator.endpoint.ServersUtil;
+import br.uece.memcached.orchestrator.management.ServersHandler;
 
 public class Delete extends Command {
 	
-	private Server server;
-	private Boolean hasResponded;
-
+	private static final String DELETED_MESSAGE = "DELETED\r\n";
+	private static final String NOTFOUND_MESSAGE = "NOT_FOUND\r\n";
+	
 	Delete(String commandMessage, ServersHandler serversHandler, ChannelHandlerContext context) {
 		super(commandMessage, serversHandler, context);
+		List<Server> servers = serversHandler.disassociateKeyFromServers(getKey());
 		
-		List<Server> candidatateServers = serversHandler.getServersByObjectKey(getKey());
-		this.server = ServersUtil.minLoad(candidatateServers);
-		
-		this.server.registerMessageHandler(this);
-		this.server.sendMessage(commandMessage);
-		
-		this.hasResponded = Boolean.FALSE;
-	}
-	
-	@Override
-	public void handle(String message) {
-		getContext().writeAndFlush(message);
-		hasResponded = Boolean.TRUE;
-		
-		synchronized (server) {
-			server.notify();
+		if (servers.isEmpty()) {
+			context.writeAndFlush(NOTFOUND_MESSAGE);
+		}
+		else {
+			context.writeAndFlush(DELETED_MESSAGE);
 		}
 	}
 	
 	@Override
+	public void handle(String message) {
+	}
+	
+	@Override
 	protected String extractKey(String commandMessage) {
-		return StringUtils.substringAfterLast(commandMessage, " ");
+		return StringUtils.substringAfterLast(commandMessage, " ").replace("\r\n", "");
 	}
 	
 	@Override
@@ -58,16 +52,10 @@ public class Delete extends Command {
 	
 	@Override
 	public void waitResponse() throws InterruptedException {
-		synchronized (server) {
-			while (!hasResponded) {
-				server.wait();
-			}
-		}
 	}
 	
 	@Override
 	public void finish() {
-		this.server.unregisterMessageHandler();
 	}
 
 }

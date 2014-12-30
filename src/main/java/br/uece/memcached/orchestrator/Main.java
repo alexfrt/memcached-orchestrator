@@ -1,24 +1,34 @@
 package br.uece.memcached.orchestrator;
 
-import br.uece.memcached.orchestrator.index.SharedIndex;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.log4j.Logger;
+
+import br.uece.memcached.orchestrator.management.ServersHandler;
+import br.uece.memcached.orchestrator.management.SharedIndex;
 
 public final class Main {
 
-    static final int CLIENTS_PORT = 9999;
-    static final SharedIndex SHARED_INDEX;
-    static final ServersHandler SERVERS_HANDLER;
-    
-    static {
-    	try {
-    		SHARED_INDEX = new SharedIndex();
-			SERVERS_HANDLER = new ServersHandler();
+	private static final Logger LOGGER = Logger.getLogger(Main.class);
+	static final int CLIENTS_PORT = 9999;
+
+	public static void main(String[] args) throws Exception {
+		List<InetSocketAddress> serversAddresses = new ArrayList<InetSocketAddress>(args.length);
+		for (String arg : args) {
+			String[] hostAndPort = arg.split(":");
+			serversAddresses.add(new InetSocketAddress(hostAndPort[0], Integer.parseInt(hostAndPort[1])));
 		}
-    	catch (Exception e) {
-			throw new RuntimeException("Could not load app", e);
+		
+		if (serversAddresses.isEmpty()) {
+			LOGGER.error("No servers informed");
+			return;
 		}
-    }
-    
-    public static void main(String[] args) throws Exception {
-        new Orchestrator(CLIENTS_PORT, SERVERS_HANDLER);
-    }
+		
+		SharedIndex sharedIndex = new SharedIndex();
+		ServersHandler serversHandler = new ServersHandler(sharedIndex, serversAddresses);
+		
+		new Orchestrator(CLIENTS_PORT, serversHandler);
+	}
 }

@@ -2,9 +2,9 @@ package br.uece.memcached.orchestrator.endpoint;
 
 import io.netty.channel.ChannelHandlerContext;
 import br.uece.memcached.orchestrator.GenericHandler;
-import br.uece.memcached.orchestrator.ServersHandler;
 import br.uece.memcached.orchestrator.command.Command;
 import br.uece.memcached.orchestrator.command.CommandType;
+import br.uece.memcached.orchestrator.management.ServersHandler;
 
 public class Client extends GenericHandler {
 	

@@ -6,9 +6,9 @@ import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 
-import br.uece.memcached.orchestrator.ServersHandler;
 import br.uece.memcached.orchestrator.endpoint.Server;
 import br.uece.memcached.orchestrator.endpoint.ServersUtil;
+import br.uece.memcached.orchestrator.management.ServersHandler;
 
 public class Get extends Command {
 	
@@ -20,26 +20,33 @@ public class Get extends Command {
 	Get(String commandMessage, ServersHandler serversHandler, ChannelHandlerContext context) {
 		super(commandMessage, serversHandler, context);
 		
-		List<Server> candidatateServers = serversHandler.getServersByObjectKey(getKey());
-		this.server = ServersUtil.minLoad(candidatateServers);
-		
-		this.server.registerMessageHandler(this);
-		this.server.sendMessage(commandMessage);
+		List<Server> servers = serversHandler.getServersAssociatedWithKey(getKey());
+		if (!servers.isEmpty()) {
+			this.server = ServersUtil.minLoad(servers);
+			
+			this.server.registerMessageHandler(this);
+			this.server.sendMessage(commandMessage);
+		}
+		else {
+			context.writeAndFlush(LAST_RESPONSE_MESSAGE);
+		}
 	}
 	
 	@Override
 	public void handle(String message) {
-		getContext().writeAndFlush(message);
-		lastResponseMessage = message;
-		
-		synchronized (server) {
-			server.notify();
+		if (server != null) {
+			getContext().writeAndFlush(message);
+			lastResponseMessage = message;
+			
+			synchronized (server) {
+				server.notify();
+			}
 		}
 	}
 	
 	@Override
 	protected String extractKey(String commandMessage) {
-		return StringUtils.substringAfterLast(commandMessage, " ");
+		return StringUtils.substringAfterLast(commandMessage, " ").replace("\r\n", "");
 	}
 
 	@Override
@@ -59,16 +66,21 @@ public class Get extends Command {
 	
 	@Override
 	public void waitResponse() throws InterruptedException {
-		synchronized (server) {
-			while (!LAST_RESPONSE_MESSAGE.equals(lastResponseMessage)) {
-				server.wait();
+		if (server != null) {
+			
+			synchronized (server) {
+				while (!LAST_RESPONSE_MESSAGE.equals(lastResponseMessage)) {
+					server.wait();
+				}
 			}
 		}
 	}
 	
 	@Override
 	public void finish() {
-		this.server.unregisterMessageHandler();
+		if (server != null) {
+			this.server.unregisterMessageHandler();
+		}
 	}
 	
 }

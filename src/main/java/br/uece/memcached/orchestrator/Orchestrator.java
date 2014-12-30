@@ -16,6 +16,7 @@ import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import br.uece.memcached.orchestrator.endpoint.Client;
+import br.uece.memcached.orchestrator.management.ServersHandler;
 
 public class Orchestrator {
 

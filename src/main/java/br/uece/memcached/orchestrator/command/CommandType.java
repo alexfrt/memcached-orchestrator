@@ -1,7 +1,7 @@
 package br.uece.memcached.orchestrator.command;
 
 import io.netty.channel.ChannelHandlerContext;
-import br.uece.memcached.orchestrator.ServersHandler;
+import br.uece.memcached.orchestrator.management.ServersHandler;
 
 public enum CommandType {
 	

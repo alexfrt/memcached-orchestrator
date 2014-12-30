@@ -1,4 +1,4 @@
-package br.uece.memcached.orchestrator.index;
+package br.uece.memcached.orchestrator.management;
 
 import java.util.HashMap;
 
@@ -12,6 +12,10 @@ public class SharedIndex {
 	
 	public Object get(String key) {
 		return hashMap.get(key);
+	}
+
+	public Object remove(String key) {
+		return hashMap.remove(key);
 	}
 
 }

@@ -1,29 +1,61 @@
 package br.uece.memcached.orchestrator.command;
 
+import io.netty.channel.ChannelHandlerContext;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 
-import io.netty.channel.ChannelHandlerContext;
-import br.uece.memcached.orchestrator.ServersHandler;
 import br.uece.memcached.orchestrator.endpoint.Server;
-import br.uece.memcached.orchestrator.endpoint.ServersUtil;
+import br.uece.memcached.orchestrator.management.ServersHandler;
 
 public class Set extends Command {
 	
-	private Server server;
+	private List<Server> servers;
+	private List<Server> firstMessageSentTo;
 	private Boolean isComplete;
 	private Boolean hasResponded;
 	
-	Set(String commandMessage, ServersHandler serversHandler, ChannelHandlerContext context) {
+	Set(final String commandMessage, ServersHandler serversHandler, ChannelHandlerContext context) {
 		super(commandMessage, serversHandler, context);
 		this.isComplete = Boolean.FALSE;
+		this.firstMessageSentTo = Collections.synchronizedList(new ArrayList<Server>());
 		
-		List<Server> candidatateServers = serversHandler.getServersByObjectKey(getKey());
-		this.server = ServersUtil.minLoad(candidatateServers);
-		
-		this.server.registerMessageHandler(this);
-		this.server.sendMessage(commandMessage);
+		this.servers = serversHandler.getServersAssociatedWithKey(getKey());
+		if (!servers.isEmpty()) {
+			for (final Server server : servers) {
+				new Thread(new Runnable() {
+					@Override
+					public void run() {
+						server.registerMessageHandler(Set.this);
+						server.sendMessage(commandMessage);
+						
+						synchronized (firstMessageSentTo) {
+							firstMessageSentTo.add(server);
+							firstMessageSentTo.notify();
+						}
+					}
+				}).start();
+			}
+		}
+		else {
+			List<Server> bestServers = serversHandler.getBestServers();
+			Server selectedServer = bestServers.get(RANDOM.nextInt(bestServers.size()));
+			this.servers = Arrays.asList(selectedServer);
+			
+			selectedServer.registerMessageHandler(this);
+			selectedServer.sendMessage(commandMessage);
+			
+			serversHandler.associateKeyToServer(getKey(), selectedServer);
+			
+			synchronized (firstMessageSentTo) {
+				firstMessageSentTo.add(selectedServer);
+				firstMessageSentTo.notify();
+			}
+		}
 		
 		hasResponded = Boolean.FALSE;
 	}
@@ -33,8 +65,8 @@ public class Set extends Command {
 		getContext().writeAndFlush(message);
 		hasResponded = Boolean.TRUE;
 		
-		synchronized (server) {
-			server.notify();
+		synchronized (servers) {
+			servers.notify();
 		}
 	}
 	
@@ -49,9 +81,27 @@ public class Set extends Command {
 	}
 	
 	@Override
-	public void append(String message) {
+	public void append(final String message) {
 		if (!isComplete()) {
-			this.server.sendMessage(message);
+			for (final Server server : servers) {
+				new Thread(new Runnable() {
+					@Override
+					public void run() {
+						synchronized (firstMessageSentTo) {
+							while (!firstMessageSentTo.contains(server)) {
+								try {
+									firstMessageSentTo.wait();
+								} catch (InterruptedException e) {
+									throw new RuntimeException(e);
+								}
+							}
+						}
+						
+						server.sendMessage(message);
+					}
+				}).start();
+			}
+			
 			isComplete = Boolean.TRUE;
 		}
 		else {
@@ -66,16 +116,18 @@ public class Set extends Command {
 	
 	@Override
 	public void waitResponse() throws InterruptedException {
-		synchronized (server) {
+		synchronized (servers) {
 			while (!hasResponded) {
-				server.wait();
+				servers.wait();
 			}
 		}
 	}
 	
 	@Override
 	public void finish() {
-		this.server.unregisterMessageHandler();
+		for (Server server : servers) {
+			server.unregisterMessageHandler();
+		}
 	}
 	
 }
