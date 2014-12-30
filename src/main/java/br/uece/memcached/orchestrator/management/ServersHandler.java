@@ -13,9 +13,11 @@ import br.uece.memcached.orchestrator.endpoint.ServersUtil;
 public class ServersHandler {
 	
 	private SharedIndex sharedIndex;
+	
 	private Map<InetSocketAddress, Server> servers;
 	private List<Server> serverList;
-	//TODO include counters
+	
+	//TODO implement the Server pool
 	
 	public ServersHandler(SharedIndex sharedIndex, List<InetSocketAddress> serversAddresses) throws Exception {
 		this.sharedIndex = sharedIndex;
