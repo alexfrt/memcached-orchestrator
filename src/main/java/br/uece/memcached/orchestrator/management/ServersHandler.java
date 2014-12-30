@@ -6,30 +6,34 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import br.uece.memcached.orchestrator.endpoint.Server;
 import br.uece.memcached.orchestrator.endpoint.ServersUtil;
+import br.uece.memcached.orchestrator.management.ResourcePool.ResourceBuilder;
+
+import com.google.common.collect.Iterables;
 
 public class ServersHandler {
 	
+	private Random random;
+	
 	private SharedIndex sharedIndex;
+	private Map<InetSocketAddress, ResourcePool<Server>> servers;
 	
-	private Map<InetSocketAddress, Server> servers;
-	private List<Server> serverList;
-	
-	//TODO implement the Server pool
-	
-	public ServersHandler(SharedIndex sharedIndex, List<InetSocketAddress> serversAddresses) throws Exception {
+	public ServersHandler(SharedIndex sharedIndex, List<InetSocketAddress> serversAddresses, Integer connectionsCount) throws Exception {
+		this.random = new Random();
 		this.sharedIndex = sharedIndex;
+		this.servers = new HashMap<InetSocketAddress, ResourcePool<Server>>(serversAddresses.size());
 		
-		this.servers = new HashMap<InetSocketAddress, Server>(serversAddresses.size());
-		this.serverList = new ArrayList<Server>(serversAddresses.size());
-		
-		for (InetSocketAddress inetSocketAddress : serversAddresses) {
-			Server server = new Server(inetSocketAddress);
+		for (final InetSocketAddress inetSocketAddress : serversAddresses) {
 			
-			this.servers.put(inetSocketAddress, server);
-			this.serverList.add(server);
+			this.servers.put(inetSocketAddress, new ResourcePool<Server>(connectionsCount, new ResourceBuilder<Server>() {
+				@Override
+				public Server build() {
+					return new Server(inetSocketAddress);
+				}
+			}));
 		}
 	}
 	
@@ -37,47 +41,21 @@ public class ServersHandler {
 		sharedIndex.put(key, Arrays.asList(server.getAddress()));
 	}
 	
-	public List<Server> disassociateKeyFromServers(String key) {
+	public Boolean disassociateKeyFromServers(String key) {
 		@SuppressWarnings("unchecked")
-		List<InetSocketAddress> holders = (List<InetSocketAddress>) sharedIndex.remove(key);
-		
-		return convertAddressesToServers(holders);
+		List<InetSocketAddress> addresses = (List<InetSocketAddress>) sharedIndex.remove(key);
+		return addresses != null && !addresses.isEmpty();
 	}
 	
 	public List<Server> getServersAssociatedWithKey(String key) {
 		@SuppressWarnings("unchecked")
-		List<InetSocketAddress> holders = (List<InetSocketAddress>) sharedIndex.get(key);
+		List<InetSocketAddress> addresses = (List<InetSocketAddress>) sharedIndex.get(key);
 		
-		return convertAddressesToServers(holders);
-	}
-
-	public List<Server> getBestServers() {
-		//TODO improve performance
-		//TODO select based on some threshold
-		
-		List<Server> servers = new ArrayList<Server>(serverList);
-		if (serverList.size() > 3) {
+		if (addresses != null && !addresses.isEmpty()) {
+			List<Server> servers = new ArrayList<Server>(addresses.size());
 			
-			List<Server> selecteds = new ArrayList<Server>(3);
-			
-			for (int i = 0; i < 3; i++) {
-				Server server = ServersUtil.minLoad(servers);
-				selecteds.add(server);
-				servers.remove(server);
-			}
-			
-			return selecteds;
-		}
-		else {
-			return servers;
-		}
-	}
-	
-	private List<Server> convertAddressesToServers(List<InetSocketAddress> holders) {
-		if (holders != null && !holders.isEmpty()) {
-			List<Server> servers = new ArrayList<Server>(holders.size());
-			for (InetSocketAddress holderAddress : holders) {
-				servers.add(this.servers.get(holderAddress));
+			for (InetSocketAddress address : addresses) {
+				servers.add(this.servers.get(address).getResource());
 			}
 			
 			return servers;
@@ -86,5 +64,40 @@ public class ServersHandler {
 			return new ArrayList<Server>(0);
 		}
 	}
+	
+	public Server getBestServerAssociatedWithKey(String key) {
+		//TODO get the load from some other place, avoiding resource lock
+		
+		List<Server> servers = getServersAssociatedWithKey(key);
+		
+		if (servers.size() > 1) {
+			Server bestServer = ServersUtil.minLoad(servers);
+			
+			servers.remove(bestServer);
+			releaseServerUsage(servers);
+			
+			return bestServer;
+		}
+		else {
+			return Iterables.getOnlyElement(servers, null);
+		}
+	}
 
+	public Server getBestServer() {
+		//TODO select based on some threshold
+		
+		List<ResourcePool<Server>> servers = new ArrayList<ResourcePool<Server>>(this.servers.values());
+		return servers.get(random.nextInt(servers.size())).getResource();
+	}
+	
+	public void releaseServerUsage(List<Server> servers) {
+		for (Server server : servers) {
+			this.servers.get(server.getAddress()).returnResource(server);
+		}
+	}
+	
+	public void releaseServerUsage(Server... servers) {
+		releaseServerUsage(Arrays.asList(servers));
+	}
+	
 }

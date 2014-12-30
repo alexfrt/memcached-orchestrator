@@ -1,15 +1,11 @@
 package br.uece.memcached.orchestrator.command;
 
-import java.util.Random;
-
 import io.netty.channel.ChannelHandlerContext;
 import br.uece.memcached.orchestrator.endpoint.MessageHandler;
 import br.uece.memcached.orchestrator.management.ServersHandler;
 
 public abstract class Command implements MessageHandler {
 
-	protected static final Random RANDOM = new Random();
-	
 	private final String key;
 	private final String commandMessage;
 	

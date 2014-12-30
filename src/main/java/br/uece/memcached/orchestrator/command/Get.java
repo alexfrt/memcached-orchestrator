@@ -2,12 +2,9 @@ package br.uece.memcached.orchestrator.command;
 
 import io.netty.channel.ChannelHandlerContext;
 
-import java.util.List;
-
 import org.apache.commons.lang3.StringUtils;
 
 import br.uece.memcached.orchestrator.endpoint.Server;
-import br.uece.memcached.orchestrator.endpoint.ServersUtil;
 import br.uece.memcached.orchestrator.management.ServersHandler;
 
 public class Get extends Command {
@@ -20,9 +17,8 @@ public class Get extends Command {
 	Get(String commandMessage, ServersHandler serversHandler, ChannelHandlerContext context) {
 		super(commandMessage, serversHandler, context);
 		
-		List<Server> servers = serversHandler.getServersAssociatedWithKey(getKey());
-		if (!servers.isEmpty()) {
-			this.server = ServersUtil.minLoad(servers);
+		this.server = serversHandler.getBestServerAssociatedWithKey(getKey());
+		if (this.server != null) {
 			
 			this.server.registerMessageHandler(this);
 			this.server.sendMessage(commandMessage);
@@ -80,6 +76,7 @@ public class Get extends Command {
 	public void finish() {
 		if (server != null) {
 			this.server.unregisterMessageHandler();
+			getServersHandler().releaseServerUsage(this.server);
 		}
 	}
 	

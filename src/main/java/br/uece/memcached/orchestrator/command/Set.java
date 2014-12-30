@@ -21,6 +21,7 @@ public class Set extends Command {
 	
 	Set(final String commandMessage, ServersHandler serversHandler, ChannelHandlerContext context) {
 		super(commandMessage, serversHandler, context);
+		
 		this.isComplete = Boolean.FALSE;
 		this.firstMessageSentTo = Collections.synchronizedList(new ArrayList<Server>());
 		
@@ -42,17 +43,16 @@ public class Set extends Command {
 			}
 		}
 		else {
-			List<Server> bestServers = serversHandler.getBestServers();
-			Server selectedServer = bestServers.get(RANDOM.nextInt(bestServers.size()));
-			this.servers = Arrays.asList(selectedServer);
+			Server bestServer = serversHandler.getBestServer();
+			this.servers = Arrays.asList(bestServer);
 			
-			selectedServer.registerMessageHandler(this);
-			selectedServer.sendMessage(commandMessage);
+			bestServer.registerMessageHandler(this);
+			bestServer.sendMessage(commandMessage);
 			
-			serversHandler.associateKeyToServer(getKey(), selectedServer);
+			serversHandler.associateKeyToServer(getKey(), bestServer);
 			
 			synchronized (firstMessageSentTo) {
-				firstMessageSentTo.add(selectedServer);
+				firstMessageSentTo.add(bestServer);
 				firstMessageSentTo.notify();
 			}
 		}
@@ -128,6 +128,8 @@ public class Set extends Command {
 		for (Server server : servers) {
 			server.unregisterMessageHandler();
 		}
+		
+		getServersHandler().releaseServerUsage(servers);
 	}
 	
 }

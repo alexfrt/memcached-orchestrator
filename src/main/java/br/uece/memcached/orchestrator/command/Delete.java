@@ -1,12 +1,9 @@
 package br.uece.memcached.orchestrator.command;
 
-import java.util.List;
-
 import io.netty.channel.ChannelHandlerContext;
 
 import org.apache.commons.lang3.StringUtils;
 
-import br.uece.memcached.orchestrator.endpoint.Server;
 import br.uece.memcached.orchestrator.management.ServersHandler;
 
 public class Delete extends Command {
@@ -16,13 +13,13 @@ public class Delete extends Command {
 	
 	Delete(String commandMessage, ServersHandler serversHandler, ChannelHandlerContext context) {
 		super(commandMessage, serversHandler, context);
-		List<Server> servers = serversHandler.disassociateKeyFromServers(getKey());
+		Boolean thereWasAnyServer = serversHandler.disassociateKeyFromServers(getKey());
 		
-		if (servers.isEmpty()) {
-			context.writeAndFlush(NOTFOUND_MESSAGE);
+		if (thereWasAnyServer) {
+			context.writeAndFlush(DELETED_MESSAGE);
 		}
 		else {
-			context.writeAndFlush(DELETED_MESSAGE);
+			context.writeAndFlush(NOTFOUND_MESSAGE);
 		}
 	}
 	
